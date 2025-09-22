@@ -1,0 +1,9 @@
+/* Muda a cor de fundo da página principal */
+.stApp {
+    background-color: black;
+}
+
+/* Estiliza o título principal */
+h1 {
+    text-align: center;
+}

@@ -38,7 +38,7 @@ def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo
     **FORMATO OBRIGATÓRIO (Múltipla Escolha):**
     Siga esta estrutura EXATAMENTE. CADA PARTE DEVE ESTAR EM UMA NOVA LINHA.
 
-    **1. [TÍTULO DA PERGUNTA EM NEGRITO]**
+    1. [TÍTULO DA PERGUNTA EM NEGRITO]**
     a) [Texto da alternativa A]
     b) [Texto da alternativa B]
     c) [Texto da alternativa C]
@@ -65,18 +65,35 @@ def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo
     **1. [PERGUNTA DISSERTATIVA EM NEGRITO]**
     """
 
-    # --- Construção Final do Prompt ---
+   # --- Construção Final do Prompt com Passo de Validação e Gabarito ---
     prompt = f"""
-    Aja como um gerador de avaliações que segue regras de formatação de forma PERFEITA.
-    Sua única tarefa é criar {num_questoes} questões sobre o tema "{tema}" para o curso de {curso}.
+    Sua primeira e mais importante tarefa é a VALIDAÇÃO. Aja como um especialista universitário.
 
-    **REGRAS INQUEBRÁVEIS:**
-    1.  **Dificuldade:** {dificuldade}.
-    2.  **Tipo de Questão:** {tipo_questao}.
-    3.  **Idioma:** Português do Brasil.
-    4.  **INCLUA AS RESPOSTAS APENAS NO FINAL.**
-    5.  **A FORMATAÇÃO É A REGRA MAIS IMPORTANTE. SIGA O EXEMPLO ABAIXO SEM NENHUM DESVIO.**
-    {exemplo_formatacao}
+    **PASSO 1: Validação do Tema vs. Curso**
+    Analise o tema "{tema}" e o curso "{curso}" fornecidos.
+    - Se o tema pertencer claramente ao curso, prossiga para o PASSO 2.
+    - Se o tema NÃO pertencer ao curso, IGNORE O PASSO 2 e responda APENAS com a seguinte mensagem de erro, sugerindo o curso correto:
+    "**ERRO DE VALIDAÇÃO:** O tema '{tema}' não parece pertencer ao curso de '{curso}'. Este tema é mais apropriado para o curso de **[Nome do Curso Correto Aqui]**."
+
+    **PASSO 2: Geração de Questões e Gabarito (Apenas se a validação for bem-sucedida)**
+    Se o tema for válido para o curso, siga estas regras INQUEBRÁVEIS:
+
+    **REGRAS DE GERAÇÃO:**
+    1.  Crie {num_questoes} questões sobre o tema.
+    2.  Use a dificuldade: {dificuldade}.
+    3.  Use o tipo de questão: {tipo_questao}.
+    4.  A formatação é a regra mais importante. Siga o exemplo abaixo sem nenhum desvio:
+        {exemplo_formatacao}
+    5.  **IMPORTANTE:** Crie TODAS as questões primeiro, sem nenhuma resposta.
+    6.  **Fórmulas Matemáticas:** Use SEMPRE o formato LaTeX envolto em símbolos de cifrão duplo ($$ ... $$) para fórmulas e equações, para que fiquem destacadas.
+    **REGRA FINAL - GABARITO:**
+    Após gerar TODAS as questões, adicione uma secção final chamada "--- GABARITO ---".
+    Dentro desta secção, liste o número de cada questão e sua resposta correta.
+    - Para Múltipla Escolha, indique a letra (Ex: 1. b)).
+    - Para Verdadeiro ou Falso, indique a palavra (Ex: 1. Verdadeiro).
+    - Para Dissertativa, forneça uma resposta-modelo curta e objetiva.
+    - Use SEMPRE o formato LaTeX envolto em símbolos de cifrão duplo ($$ ... $$) para fórmulas e equações, para que fiquem destacadas.
+    - Toda e qualquer expressão matemática DEVE obrigatoriamente estar entre $$ (exemplo: $$x^2$$). NUNCA escreva matemática em texto simples.
     """
 
     print("Enviando prompt para o Llama 3...")
@@ -92,7 +109,7 @@ def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo
             ],
             # --- LINHA CORRIGIDA E ATUALIZADA ---
             model="openai/gpt-oss-120b", # Modelo Llama 3 mais recente e estável
-            temperature=0.7,
+            temperature=0.2,
             max_tokens=2048,
         )
 

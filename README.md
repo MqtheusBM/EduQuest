@@ -1,1 +1,1 @@
-Front-end do EduQuest
+EduQuest

@@ -3,13 +3,10 @@ from dotenv import load_dotenv
 from groq import Groq
 import re
 
-# Carrega as variáveis de ambiente do ficheiro .env
 load_dotenv()
 
-# Pega a chave de API da Groq do ambiente
 groq_api_key = os.getenv("GROQ_API_KEY")
 
-# Inicializa o cliente da Groq
 try:
     client = Groq(api_key=groq_api_key)
 except Exception as e:
@@ -18,20 +15,13 @@ except Exception as e:
 
 def formatar_alternativas(texto, tipo_questao):
     if tipo_questao.lower() == "múltipla escolha":
-        # Garante que cada alternativa (a), b), c), etc.) fique em uma nova linha
         texto = re.sub(r'(?<!\n)([a-h]\))', r'\n\1', texto)
-        # Remove linhas em branco duplicadas
         texto = re.sub(r'\n{3,}', r'\n\n', texto)
     return texto
 
-def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo_anexado=None):
-    """
-    Função principal do backend que chama a API do Llama 3 para gerar questões.
-    """
+def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, contexto):
     if not client:
         return "ERRO: O cliente da API da Groq não foi inicializado corretamente. Verifique sua chave de API no ficheiro .env."
-
-    # --- Lógica para escolher o exemplo de formatação correto ---
     exemplo_formatacao = ""
     if tipo_questao == "Múltipla escolha":
         exemplo_formatacao = """
@@ -64,42 +54,56 @@ def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo
 
     **1. [PERGUNTA DISSERTATIVA EM NEGRITO]**
     """
+    instrucao_documento = ""
+    texto_validacao = ""
+    texto_geracao = ""
+    if contexto.strip():
+        instrucao_documento = f"""
+        \n\n=========================================
+        **MATERIAL DE REFERÊNCIA OBRIGATÓRIO:**
+        {contexto}
+        =========================================
+        """
+    if tema.strip() and contexto.strip():
+        # CENÁRIO 3: Tem Tema e Ficheiro
+        texto_validacao = f'Analise se o tema "{tema}" e o material de referência estão adequados para o curso de "{curso}".'
+        texto_geracao = f'Crie {num_questoes} questões ESPECIFICAMENTE sobre o tema "{tema}", baseando-se EXCLUSIVAMENTE no material de referência acima. Se a resposta não estiver no texto, não faça a pergunta.'
 
-   # --- Construção Final do Prompt com Passo de Validação e Gabarito ---
+    elif contexto.strip():
+        # CENARIO 2: Só Ficheiro
+        texto_geracao = f'Analise o material de referência fornecido. Verifique se ele  se enquadra de forma geral no curso de "{curso}".'
+
+    else:
+        # CENARIO 1: Só Tema
+        texto_validacao = f'Crie {num_questoes} questões gerais sobre o tema "{tema}".'
+
     prompt = f"""
-    Sua primeira e mais importante tarefa é a VALIDAÇÃO. Aja como um especialista universitário.
+    Sua tarefa é agir como um professor universitário e criar avaliações precisas.
 
-    **PASSO 1: Validação do Tema vs. Curso**
-    Analise o tema "{tema}" e o curso "{curso}" fornecidos.
-    - Se o tema pertencer claramente ao curso, prossiga para o PASSO 2.
-    - Se o tema NÃO pertencer ao curso, IGNORE O PASSO 2 e responda APENAS com a seguinte mensagem de erro, sugerindo o curso correto:
-    "**ERRO DE VALIDAÇÃO:** O tema '{tema}' não parece pertencer ao curso de '{curso}'. Este tema é mais apropriado para o curso de **[Nome do Curso Correto Aqui]**."
+    **PASSO 1: Validação**
+    {texto_validacao}
+    Se não houver relação nenhuma com o curso, responda APENAS:
+    "**ERRO DE VALIDAÇÃO:** O tema ou documento fornecido não parece pertencer ao curso de '{curso}'."
 
-    **PASSO 2: Geração de Questões e Gabarito (Apenas se a validação for bem-sucedida)**
-    Se o tema for válido para o curso, siga estas regras INQUEBRÁVEIS:
+    {instrucao_documento}
 
-    **REGRAS DE GERAÇÃO:**
-    1.  Crie {num_questoes} questões sobre o tema.
-    2.  Use a dificuldade: {dificuldade}.
-    3.  Use o tipo de questão: {tipo_questao}.
-    4.  A formatação é a regra mais importante. Siga o exemplo abaixo sem nenhum desvio:
-        {exemplo_formatacao}
-    5.  **IMPORTANTE:** Crie TODAS as questões primeiro, sem nenhuma resposta.
-    6.  **Fórmulas Matemáticas:** Use SEMPRE o formato LaTeX envolto em símbolos de cifrão duplo ($$ ... $$) para fórmulas e equações, para que fiquem destacadas.
-    **REGRA FINAL - GABARITO:**
-    Após gerar TODAS as questões, adicione uma secção final chamada "--- GABARITO ---".
-    Dentro desta secção, liste o número de cada questão e sua resposta correta.
-    - Para Múltipla Escolha, indique a letra (Ex: 1. b)).
-    - Para Verdadeiro ou Falso, indique a palavra (Ex: 1. Verdadeiro).
-    - Para Dissertativa, forneça uma resposta-modelo curta e objetiva.
-    - Use SEMPRE o formato LaTeX envolto em símbolos de cifrão duplo ($$ ... $$) para fórmulas e equações, para que fiquem destacadas.
-    - Toda e qualquer expressão matemática DEVE obrigatoriamente estar entre $$ (exemplo: $$x^2$$). NUNCA escreva matemática em texto simples.
+    **PASSO 2: Geração de Questões (Apenas se a validação for bem-sucedida)**
+    {texto_geracao}
+    
+    **REGRAS OBRIGATÓRIAS:**
+    1. Nível de dificuldade: {dificuldade}.
+    2. Tipo de questão: {tipo_questao}.
+    3. Siga a formatação abaixo estritamente, sem exceções:
+    {exemplo_formatacao}
+    4. Fórmulas Matemáticas: Use o formato LaTeX entre duplo cifrão ($$ ... $$).
+
+    **GABARITO:**
+    No final, adicione uma seção "--- GABARITO ---" e liste as respostas corretas.
     """
 
-    print("Enviando prompt para o Llama 3...")
+    print("A enviar prompt dinâmico para o LLM...")
 
     try:
-        # Chama a API da Groq para executar o Llama 3
         chat_completion = client.chat.completions.create(
             messages=[
                 {
@@ -107,13 +111,10 @@ def gerar_questoes(tema, curso, dificuldade, tipo_questao, num_questoes, arquivo
                     "content": prompt,
                 }
             ],
-            # --- LINHA CORRIGIDA E ATUALIZADA ---
-            model="openai/gpt-oss-120b", # Modelo Llama 3 mais recente e estável
+            model="openai/gpt-oss-120b", 
             temperature=0.2,
             max_tokens=2048,
         )
-
-        # Extrai e retorna o conteúdo da resposta da IA
         resposta_ia = chat_completion.choices[0].message.content
         resposta_ia = formatar_alternativas(resposta_ia, tipo_questao)
         return resposta_ia
